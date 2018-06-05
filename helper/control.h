@@ -24,11 +24,13 @@ public slots:
     void HideKeyboard();
 
 protected:
-    bool event(QEvent *event) Q_DECL_OVERRIDE;
+    bool eventFilter(QObject *watched, QEvent *event) Q_DECL_OVERRIDE;
 
 private:
     QLineEdit *m_edit;
     QPlatformInputContext *m_imContext;
+
+    QString m_previousCommit;
 };
 
 #endif // CONTROL_H

@@ -16,6 +16,7 @@ Control::Control(QObject *parent)
       m_edit(new QLineEdit),
       m_imContext(nullptr)
 {
+    m_edit->installEventFilter(this);
     imContext()->setFocusObject(m_edit);
 
     qApp->installEventFilter(this);
@@ -44,15 +45,17 @@ void Control::HideKeyboard()
     imContext()->hideInputPanel();
 }
 
-bool Control::event(QEvent *event)
+bool Control::eventFilter(QObject *watched, QEvent *event)
 {
-    if (event->type() == QEvent::InputMethod) {
+    if (watched == m_edit && event->type() == QEvent::InputMethod) {
         QInputMethodEvent *im = static_cast<QInputMethodEvent*>(event);
-        if (!im->commitString().isEmpty())
+        if (!im->commitString().isEmpty() && m_previousCommit != im->commitString()) {
+            m_previousCommit = im->commitString();
             emit Commit(im->commitString());
+        }
     }
 
-    return QObject::event(event);
+    return QObject::eventFilter(watched, event);
 }
 
 QPlatformInputContext *Control::imContext()
