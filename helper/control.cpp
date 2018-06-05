@@ -1,21 +1,27 @@
 #include "control.h"
 
-#include <QGuiApplication>
+#include <QApplication>
 
 #include <QEvent>
+#include <QDebug>
+#include <QLineEdit>
 
 #include <private/qguiapplication_p.h>
 
 #include <qpa/qplatformintegration.h>
-#include <qpa/qplatforminputcontext.h>
+
 
 Control::Control(QObject *parent)
-    :QObject(parent)
+    :QObject(parent),
+      m_edit(new QLineEdit),
+      m_imContext(nullptr)
 {
+    imContext()->setFocusObject(m_edit);
+
     qApp->installEventFilter(this);
     connect(qApp, &QGuiApplication::focusObjectChanged,
             this, [this](QObject *) {
-        QGuiApplicationPrivate::platformIntegration()->inputContext()->setFocusObject(this);
+        imContext()->setFocusObject(m_edit);
     });
 }
 
@@ -24,14 +30,18 @@ Control::~Control()
 
 }
 
-void Control::showKeyboard()
+void Control::ShowKeyboard()
 {
-    QGuiApplicationPrivate::platformIntegration()->inputContext()->showInputPanel();
+    qDebug() << "ShowKeyboard";
+
+    imContext()->showInputPanel();
 }
 
-void Control::hideKeyboard()
+void Control::HideKeyboard()
 {
-    QGuiApplicationPrivate::platformIntegration()->inputContext()->hideInputPanel();
+    qDebug() << "HideKeyboard";
+
+    imContext()->hideInputPanel();
 }
 
 bool Control::event(QEvent *event)
@@ -39,8 +49,16 @@ bool Control::event(QEvent *event)
     if (event->type() == QEvent::InputMethod) {
         QInputMethodEvent *im = static_cast<QInputMethodEvent*>(event);
         if (!im->commitString().isEmpty())
-            emit commitString(im->commitString());
+            emit Commit(im->commitString());
     }
 
     return QObject::event(event);
+}
+
+QPlatformInputContext *Control::imContext()
+{
+    if (!m_imContext)
+        m_imContext = QGuiApplicationPrivate::platformIntegration()->inputContext();
+
+    return m_imContext;
 }

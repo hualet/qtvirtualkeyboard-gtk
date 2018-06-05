@@ -2,6 +2,9 @@
 #define CONTROL_H
 
 #include <QObject>
+#include <QLineEdit>
+
+#include <qpa/qplatforminputcontext.h>
 
 class Control: public QObject
 {
@@ -11,15 +14,21 @@ public:
     Control(QObject *parent = 0);
     ~Control();
 
+    QPlatformInputContext *imContext();
+
 signals:
-    void commitString(const QString &string);
+    void Commit(const QString &string);
 
 public slots:
-    void showKeyboard();
-    void hideKeyboard();
+    void ShowKeyboard();
+    void HideKeyboard();
 
 protected:
     bool event(QEvent *event) Q_DECL_OVERRIDE;
+
+private:
+    QLineEdit *m_edit;
+    QPlatformInputContext *m_imContext;
 };
 
 #endif // CONTROL_H

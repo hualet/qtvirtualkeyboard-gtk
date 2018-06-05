@@ -1,0 +1,7 @@
+<interface name="com.deepin.VirtualKeyboard">
+	<method name="ShowKeyboard"></method>
+	<method name="HideKeyboard"></method>
+	<signal name="Commit">
+		<arg type="s" name="String">
+	</signal>
+</interface>
