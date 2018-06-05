@@ -28,6 +28,7 @@ protected:
 
 private:
     QLineEdit *m_edit;
+    QWindow *m_focusWindow;
     QPlatformInputContext *m_imContext;
 
     QString m_previousCommit;
