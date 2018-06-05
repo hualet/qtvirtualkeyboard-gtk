@@ -224,9 +224,21 @@ static const _ExtendedGDBusSignalInfo _com_deepin_virtual_keyboard_signal_info_c
   "commit"
 };
 
+static const _ExtendedGDBusSignalInfo _com_deepin_virtual_keyboard_signal_info_backspace =
+{
+  {
+    -1,
+    (gchar *) "Backspace",
+    NULL,
+    NULL
+  },
+  "backspace"
+};
+
 static const _ExtendedGDBusSignalInfo * const _com_deepin_virtual_keyboard_signal_info_pointers[] =
 {
   &_com_deepin_virtual_keyboard_signal_info_commit,
+  &_com_deepin_virtual_keyboard_signal_info_backspace,
   NULL
 };
 
@@ -286,6 +298,7 @@ com_deepin_virtual_keyboard_override_properties (GObjectClass *klass, guint prop
  * @parent_iface: The parent interface.
  * @handle_hide_keyboard: Handler for the #ComDeepinVirtualKeyboard::handle-hide-keyboard signal.
  * @handle_show_keyboard: Handler for the #ComDeepinVirtualKeyboard::handle-show-keyboard signal.
+ * @backspace: Handler for the #ComDeepinVirtualKeyboard::backspace signal.
  * @commit: Handler for the #ComDeepinVirtualKeyboard::commit signal.
  *
  * Virtual table for the D-Bus interface <link linkend="gdbus-interface-com-deepin-VirtualKeyboard.top_of_page">com.deepin.VirtualKeyboard</link>.
@@ -362,6 +375,24 @@ com_deepin_virtual_keyboard_default_init (ComDeepinVirtualKeyboardIface *iface)
     G_TYPE_NONE,
     1, G_TYPE_STRING);
 
+  /**
+   * ComDeepinVirtualKeyboard::backspace:
+   * @object: A #ComDeepinVirtualKeyboard.
+   *
+   * On the client-side, this signal is emitted whenever the D-Bus signal <link linkend="gdbus-signal-com-deepin-VirtualKeyboard.Backspace">"Backspace"</link> is received.
+   *
+   * On the service-side, this signal can be used with e.g. g_signal_emit_by_name() to make the object emit the D-Bus signal.
+   */
+  g_signal_new ("backspace",
+    G_TYPE_FROM_INTERFACE (iface),
+    G_SIGNAL_RUN_LAST,
+    G_STRUCT_OFFSET (ComDeepinVirtualKeyboardIface, backspace),
+    NULL,
+    NULL,
+    g_cclosure_marshal_generic,
+    G_TYPE_NONE,
+    0);
+
 }
 
 /**
@@ -377,6 +408,19 @@ com_deepin_virtual_keyboard_emit_commit (
     const gchar *arg_String)
 {
   g_signal_emit_by_name (object, "commit", arg_String);
+}
+
+/**
+ * com_deepin_virtual_keyboard_emit_backspace:
+ * @object: A #ComDeepinVirtualKeyboard.
+ *
+ * Emits the <link linkend="gdbus-signal-com-deepin-VirtualKeyboard.Backspace">"Backspace"</link> D-Bus signal.
+ */
+void
+com_deepin_virtual_keyboard_emit_backspace (
+    ComDeepinVirtualKeyboard *object)
+{
+  g_signal_emit_by_name (object, "backspace");
 }
 
 /**
@@ -1178,6 +1222,28 @@ _com_deepin_virtual_keyboard_on_signal_commit (
   g_list_free_full (connections, g_object_unref);
 }
 
+static void
+_com_deepin_virtual_keyboard_on_signal_backspace (
+    ComDeepinVirtualKeyboard *object)
+{
+  ComDeepinVirtualKeyboardSkeleton *skeleton = COM_DEEPIN_VIRTUAL_KEYBOARD_SKELETON (object);
+
+  GList      *connections, *l;
+  GVariant   *signal_variant;
+  connections = g_dbus_interface_skeleton_get_connections (G_DBUS_INTERFACE_SKELETON (skeleton));
+
+  signal_variant = g_variant_ref_sink (g_variant_new ("()"));
+  for (l = connections; l != NULL; l = l->next)
+    {
+      GDBusConnection *connection = l->data;
+      g_dbus_connection_emit_signal (connection,
+        NULL, g_dbus_interface_skeleton_get_object_path (G_DBUS_INTERFACE_SKELETON (skeleton)), "com.deepin.VirtualKeyboard", "Backspace",
+        signal_variant, NULL);
+    }
+  g_variant_unref (signal_variant);
+  g_list_free_full (connections, g_object_unref);
+}
+
 static void com_deepin_virtual_keyboard_skeleton_iface_init (ComDeepinVirtualKeyboardIface *iface);
 #if GLIB_VERSION_MAX_ALLOWED >= GLIB_VERSION_2_38
 G_DEFINE_TYPE_WITH_CODE (ComDeepinVirtualKeyboardSkeleton, com_deepin_virtual_keyboard_skeleton, G_TYPE_DBUS_INTERFACE_SKELETON,
@@ -1238,6 +1304,7 @@ static void
 com_deepin_virtual_keyboard_skeleton_iface_init (ComDeepinVirtualKeyboardIface *iface)
 {
   iface->commit = _com_deepin_virtual_keyboard_on_signal_commit;
+  iface->backspace = _com_deepin_virtual_keyboard_on_signal_backspace;
 }
 
 /**

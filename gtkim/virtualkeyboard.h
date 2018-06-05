@@ -37,6 +37,9 @@ struct _ComDeepinVirtualKeyboardIface
     ComDeepinVirtualKeyboard *object,
     GDBusMethodInvocation *invocation);
 
+  void (*backspace) (
+    ComDeepinVirtualKeyboard *object);
+
   void (*commit) (
     ComDeepinVirtualKeyboard *object,
     const gchar *arg_String);
@@ -64,6 +67,9 @@ void com_deepin_virtual_keyboard_complete_hide_keyboard (
 void com_deepin_virtual_keyboard_emit_commit (
     ComDeepinVirtualKeyboard *object,
     const gchar *arg_String);
+
+void com_deepin_virtual_keyboard_emit_backspace (
+    ComDeepinVirtualKeyboard *object);
 
 
 

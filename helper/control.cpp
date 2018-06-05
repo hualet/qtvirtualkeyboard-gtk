@@ -71,6 +71,8 @@ bool Control::eventFilter(QObject *watched, QEvent *event)
             QKeyEvent *key = static_cast<QKeyEvent*>(event);
             if (!key->text().isEmpty()) {
                 emit Commit(key->text());
+            } else if (key->key() == Qt::Key_Backspace) {
+                emit Backspace();
             }
         }
     }

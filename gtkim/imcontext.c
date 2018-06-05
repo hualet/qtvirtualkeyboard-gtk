@@ -63,6 +63,9 @@ static void _qvk_im_context_commit_string_cb(GObject *gobject,
                                              const gchar *string,
                                              void* user_data);
 
+static void _qvk_im_context_backspace_cb(GObject *gobject,
+                                         void* user_data);
+
 #if GTK_CHECK_VERSION(3, 6, 0)
 
 static void _qvk_im_context_input_hints_changed_cb(GObject *gobject,
@@ -194,6 +197,10 @@ static void qvk_im_context_init(QVKIMContext *context) {
 
     g_signal_connect(kb_proxy, "commit",
                      G_CALLBACK(_qvk_im_context_commit_string_cb),
+                     context);
+
+    g_signal_connect(kb_proxy, "backspace",
+                     G_CALLBACK(_qvk_im_context_backspace_cb),
                      context);
 
 #if GTK_CHECK_VERSION(3, 6, 0)
@@ -343,13 +350,26 @@ void _qvk_im_context_commit_string_cb(GObject *gobject,
                                       const gchar *string,
                                       void *user_data)
 {
-    QVK_DEBUG("commit string: %s", string);
+    QVK_DEBUG("callback commit string: %s", string);
 
     QVKIMContext *context = QVK_IM_CONTEXT(user_data);
     if (context) {
         g_signal_emit(context, _signal_commit_id, 0, string);
     }
 }
+
+void _qvk_im_context_backspace_cb(GObject *gobject,
+                                  void *user_data)
+{
+    QVK_DEBUG("callback backspace.");
+
+    QVKIMContext *context = QVK_IM_CONTEXT(user_data);
+    if (context) {
+        gboolean return_value;
+        g_signal_emit(context, _signal_delete_surrounding_id, 0, -1, 1, &return_value);
+    }
+}
+
 
 #if GTK_CHECK_VERSION(3, 6, 0)
 

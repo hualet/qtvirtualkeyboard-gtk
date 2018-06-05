@@ -37,6 +37,7 @@ class VirtualKeyboard: public QDBusAbstractAdaptor
 "    <signal name=\"Commit\">\n"
 "      <arg type=\"s\" name=\"String\"/>\n"
 "    </signal>\n"
+"    <signal name=\"Backspace\"/>\n"
 "  </interface>\n"
         "")
 public:
@@ -48,6 +49,7 @@ public Q_SLOTS: // METHODS
     void HideKeyboard();
     void ShowKeyboard();
 Q_SIGNALS: // SIGNALS
+    void Backspace();
     void Commit(const QString &String);
 };
 
