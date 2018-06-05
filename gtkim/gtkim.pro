@@ -27,7 +27,9 @@ PKGCONFIG += gtk+-3.0
 
 SOURCES += \
         im.c \
-    imcontext.c
+    imcontext.c \
+    virtualkeyboard.c
 
 HEADERS += \
-    imcontext.h
+    imcontext.h \
+    virtualkeyboard.h

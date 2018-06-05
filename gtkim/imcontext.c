@@ -11,6 +11,7 @@
 #include <gdk/gdkx.h>
 
 #include "imcontext.h"
+#include "virtualkeyboard.h"
 
 #if !GTK_CHECK_VERSION(2, 91, 0)
 #define DEPRECATED_GDK_KEYSYMS 1
@@ -20,10 +21,8 @@
 #define NEW_GDK_WINDOW_GET_DISPLAY
 #endif
 
-#define QVK_DEBUG(...) \
-    printf("debug: "); \
-    printf(__VA_ARGS__); \
-    printf("\n");
+#define QVK_DEBUG(...) g_debug(__VA_ARGS__)
+#define QVK_WARN(...) g_warning(__VA_ARGS__)
 
 struct _QVKIMContext {
     GtkIMContext parent;
@@ -60,6 +59,10 @@ static void qvk_im_context_get_preedit_string(GtkIMContext *context,
                                               PangoAttrList **attrs,
                                               gint *cursor_pos);
 
+static void _qvk_im_context_commit_string_cb(GObject *gobject,
+                                             const gchar *string,
+                                             void* user_data);
+
 #if GTK_CHECK_VERSION(3, 6, 0)
 
 static void _qvk_im_context_input_hints_changed_cb(GObject *gobject,
@@ -82,6 +85,10 @@ static guint _signal_retrieve_surrounding_id = 0;
 static gboolean _use_sync_mode = 0;
 
 static GtkIMContext *_focus_im_context = NULL;
+
+// dbus stuff
+static ComDeepinVirtualKeyboard *kb_proxy = NULL;
+static GError *kb_error = NULL;
 
 void qvk_im_context_register_type(GTypeModule *type_module) {
     static const GTypeInfo qvk_im_context_info = {
@@ -173,6 +180,22 @@ static void qvk_im_context_class_fini(QVKIMContextClass *klass) {
 static void qvk_im_context_init(QVKIMContext *context) {
     QVK_DEBUG("qvk_im_context_init");
 
+    kb_proxy = com_deepin_virtual_keyboard_proxy_new_for_bus_sync(
+                G_BUS_TYPE_SESSION,
+                G_DBUS_PROXY_FLAGS_NONE,
+                "com.deepin.VirtualKeyboard",
+                "/com/deepin/VirtualKeyboard",
+                NULL, &kb_error);
+
+    if (kb_error != NULL) {
+        QVK_WARN("failed to create virtual keyboard proxy instance %s", kb_error->message);
+        kb_error = NULL;
+    }
+
+    g_signal_connect(kb_proxy, "commit",
+                     G_CALLBACK(_qvk_im_context_commit_string_cb),
+                     context);
+
 #if GTK_CHECK_VERSION(3, 6, 0)
     g_signal_connect(context, "notify::input-hints",
                      G_CALLBACK(_qvk_im_context_input_hints_changed_cb),
@@ -188,6 +211,8 @@ static void qvk_im_context_finalize(GObject *obj) {
     QVKIMContext *context = QVK_IM_CONTEXT(obj);
 
     qvk_im_context_set_client_window(GTK_IM_CONTEXT(context), NULL);
+
+    g_object_unref(kb_proxy);
 
     G_OBJECT_CLASS(parent_class)->finalize(obj);
 }
@@ -226,11 +251,27 @@ static gboolean qvk_im_context_filter_keypress(GtkIMContext *context,
 static void qvk_im_context_focus_in(GtkIMContext *context) {
     QVK_DEBUG("qvk_im_context_focus_in");
 
+    com_deepin_virtual_keyboard_call_show_keyboard_sync(
+                kb_proxy,
+                NULL, &kb_error);
+
+    if (kb_error) {
+        QVK_WARN("failed call to show keyboard: %s", kb_error->message);
+    }
+
     return;
 }
 
 static void qvk_im_context_focus_out(GtkIMContext *context) {
     QVK_DEBUG("qvk_im_context_focus_out");
+
+    com_deepin_virtual_keyboard_call_hide_keyboard_sync(
+                kb_proxy,
+                NULL, &kb_error);
+
+    if (kb_error) {
+        QVK_WARN("failed call to hide keyboard: %s", kb_error->message);
+    }
 
     return;
 }
@@ -296,6 +337,18 @@ static void qvk_im_context_get_preedit_string(GtkIMContext *context,
         *cursor_pos = 0;
 
     return;
+}
+
+void _qvk_im_context_commit_string_cb(GObject *gobject,
+                                      const gchar *string,
+                                      void *user_data)
+{
+    QVK_DEBUG("commit string: %s", string);
+
+    QVKIMContext *context = QVK_IM_CONTEXT(user_data);
+    if (context) {
+        g_signal_emit(context, _signal_commit_id, 0, string);
+    }
 }
 
 #if GTK_CHECK_VERSION(3, 6, 0)
