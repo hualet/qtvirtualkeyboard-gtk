@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <xkbcommon/xkbcommon-compose.h>
 
 #ifdef GDK_WINDOWING_WAYLAND
@@ -73,6 +74,10 @@ static void _qvk_im_context_commit_string_cb(GObject *gobject,
 
 static void _qvk_im_context_backspace_cb(GObject *gobject,
                                          void* user_data);
+
+static GdkEventKey *_create_gdk_event(GdkWindow *window, guint keyval, guint state,
+                                      GdkEventType type);
+static gboolean _key_is_modifier(guint keyval);
 
 #if GTK_CHECK_VERSION(3, 6, 0)
 
@@ -238,7 +243,9 @@ static void set_ic_client_window(QVKIMContext *context,
 ///
 static void qvk_im_context_set_client_window(GtkIMContext *context,
                                              GdkWindow *client_window) {
-    QVK_DEBUG("qvk_im_context_set_client_window");
+    QVK_DEBUG("qvk_im_context_set_client_window: %lu",
+              client_window ? GDK_WINDOW_XID(client_window) : 0);
+
     QVKIMContext *qvkcontext = QVK_IM_CONTEXT(context);
     set_ic_client_window(qvkcontext, client_window);
 }
@@ -275,6 +282,12 @@ static void qvk_im_context_focus_in(GtkIMContext *context) {
                     qvkcontext->kb_proxy, "backspace",
                     G_CALLBACK(_qvk_im_context_backspace_cb),
                     context);
+    }
+
+    // some application won't set client window, eg. google-chrome.
+    if (!qvkcontext->client_window) {
+        set_ic_client_window(qvkcontext,
+                             gdk_screen_get_active_window(gdk_screen_get_default()));
     }
 
     return;
@@ -381,12 +394,178 @@ void _qvk_im_context_backspace_cb(GObject *gobject,
     QVK_DEBUG("callback backspace.");
 
     QVKIMContext *context = QVK_IM_CONTEXT(user_data);
-    if (context) {
-        gboolean return_value;
-        g_signal_emit(context, _signal_delete_surrounding_id, 0, -1, 1, &return_value);
-    }
+
+    GdkEventKey *event = _create_gdk_event(context->client_window, GDK_KEY_BackSpace, 0, GDK_KEY_PRESS);
+    gdk_event_put((GdkEvent *)event);
+    gdk_event_free((GdkEvent *)event);
+
+//    if (context->client_window) {
+//        gchar cmd[128];
+//        sprintf(cmd, "xdotool key --window %lu BackSpace",
+//                GDK_WINDOW_XID(gdk_window_get_toplevel(context->client_window)));
+//        QVK_WARN("%lu", GDK_WINDOW_XID(gdk_window_get_toplevel(context->client_window)));
+//        system(cmd);
+//    }
 }
 
+/* modification is based on fcitx version */
+static GdkEventKey *_create_gdk_event(GdkWindow *window, guint keyval, guint state,
+                                      GdkEventType type) {
+    gunichar c = 0;
+    gchar buf[8];
+
+    GdkEventKey *event = (GdkEventKey *)gdk_event_new(type);
+
+    event->window = g_object_ref(window);
+    event->time = GDK_CURRENT_TIME;
+    event->send_event = FALSE;
+    event->state = state;
+    event->keyval = keyval;
+    event->string = NULL;
+    event->length = 0;
+    event->hardware_keycode = 0;
+    if (event->window) {
+#ifndef NEW_GDK_WINDOW_GET_DISPLAY
+        GdkDisplay *display = gdk_display_get_default();
+#else
+        GdkDisplay *display = gdk_window_get_display(event->window);
+#endif
+        GdkKeymap *keymap = gdk_keymap_get_for_display(display);
+        GdkKeymapKey *keys;
+        gint n_keys = 0;
+
+        if (gdk_keymap_get_entries_for_keyval(keymap, keyval, &keys, &n_keys)) {
+            if (n_keys)
+                event->hardware_keycode = keys[0].keycode;
+            g_free(keys);
+        }
+    }
+
+    event->group = 0;
+    event->is_modifier = _key_is_modifier(keyval);
+
+#ifdef DEPRECATED_GDK_KEYSYMS
+    if (keyval != GDK_VoidSymbol)
+#else
+    if (keyval != GDK_KEY_VoidSymbol)
+#endif
+        c = gdk_keyval_to_unicode(keyval);
+
+    if (c) {
+        gsize bytes_written;
+        gint len;
+
+        /* Apply the control key - Taken from Xlib
+        */
+        if (event->state & GDK_CONTROL_MASK) {
+            if ((c >= '@' && c < '\177') || c == ' ')
+                c &= 0x1F;
+            else if (c == '2') {
+                event->string = g_memdup("\0\0", 2);
+                event->length = 1;
+                buf[0] = '\0';
+                goto out;
+            } else if (c >= '3' && c <= '7')
+                c -= ('3' - '\033');
+            else if (c == '8')
+                c = '\177';
+            else if (c == '/')
+                c = '_' & 0x1F;
+        }
+
+        len = g_unichar_to_utf8(c, buf);
+        buf[len] = '\0';
+
+        event->string =
+            g_locale_from_utf8(buf, len, NULL, &bytes_written, NULL);
+        if (event->string)
+            event->length = bytes_written;
+#ifdef DEPRECATED_GDK_KEYSYMS
+    } else if (keyval == GDK_Escape) {
+#else
+    } else if (keyval == GDK_KEY_Escape) {
+#endif
+        event->length = 1;
+        event->string = g_strdup("\033");
+    }
+#ifdef DEPRECATED_GDK_KEYSYMS
+    else if (keyval == GDK_Return || keyval == GDK_KP_Enter) {
+#else
+    else if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
+#endif
+        event->length = 1;
+        event->string = g_strdup("\r");
+    }
+
+    if (!event->string) {
+        event->length = 0;
+        event->string = g_strdup("");
+    }
+out:
+    return event;
+}
+
+gboolean _key_is_modifier(guint keyval) {
+    /* See gdkkeys-x11.c:_gdk_keymap_key_is_modifier() for how this
+    * really should be implemented */
+
+    switch (keyval) {
+#ifdef DEPRECATED_GDK_KEYSYMS
+    case GDK_Shift_L:
+    case GDK_Shift_R:
+    case GDK_Control_L:
+    case GDK_Control_R:
+    case GDK_Caps_Lock:
+    case GDK_Shift_Lock:
+    case GDK_Meta_L:
+    case GDK_Meta_R:
+    case GDK_Alt_L:
+    case GDK_Alt_R:
+    case GDK_Super_L:
+    case GDK_Super_R:
+    case GDK_Hyper_L:
+    case GDK_Hyper_R:
+    case GDK_ISO_Lock:
+    case GDK_ISO_Level2_Latch:
+    case GDK_ISO_Level3_Shift:
+    case GDK_ISO_Level3_Latch:
+    case GDK_ISO_Level3_Lock:
+    case GDK_ISO_Group_Shift:
+    case GDK_ISO_Group_Latch:
+    case GDK_ISO_Group_Lock:
+        return TRUE;
+#else
+    case GDK_KEY_Shift_L:
+    case GDK_KEY_Shift_R:
+    case GDK_KEY_Control_L:
+    case GDK_KEY_Control_R:
+    case GDK_KEY_Caps_Lock:
+    case GDK_KEY_Shift_Lock:
+    case GDK_KEY_Meta_L:
+    case GDK_KEY_Meta_R:
+    case GDK_KEY_Alt_L:
+    case GDK_KEY_Alt_R:
+    case GDK_KEY_Super_L:
+    case GDK_KEY_Super_R:
+    case GDK_KEY_Hyper_L:
+    case GDK_KEY_Hyper_R:
+    case GDK_KEY_ISO_Lock:
+    case GDK_KEY_ISO_Level2_Latch:
+    case GDK_KEY_ISO_Level3_Shift:
+    case GDK_KEY_ISO_Level3_Latch:
+    case GDK_KEY_ISO_Level3_Lock:
+    case GDK_KEY_ISO_Level5_Shift:
+    case GDK_KEY_ISO_Level5_Latch:
+    case GDK_KEY_ISO_Level5_Lock:
+    case GDK_KEY_ISO_Group_Shift:
+    case GDK_KEY_ISO_Group_Latch:
+    case GDK_KEY_ISO_Group_Lock:
+        return TRUE;
+#endif
+    default:
+        return FALSE;
+    }
+}
 
 #if GTK_CHECK_VERSION(3, 6, 0)
 
