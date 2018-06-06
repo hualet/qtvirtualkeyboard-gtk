@@ -14,6 +14,8 @@
 #include "imcontext.h"
 #include "virtualkeyboard.h"
 
+#include "interface.h"
+
 #if !GTK_CHECK_VERSION(2, 91, 0)
 #define DEPRECATED_GDK_KEYSYMS 1
 #endif
@@ -72,8 +74,9 @@ static void _qvk_im_context_commit_string_cb(GObject *gobject,
                                              const gchar *string,
                                              void* user_data);
 
-static void _qvk_im_context_backspace_cb(GObject *gobject,
-                                         void* user_data);
+static void _qvk_im_context_forward_key_cb(GObject *gobject,
+                                           gchar* key,
+                                           void* user_data);
 
 static GdkEventKey *_create_gdk_event(GdkWindow *window, guint keyval, guint state,
                                       GdkEventType type);
@@ -279,8 +282,8 @@ static void qvk_im_context_focus_in(GtkIMContext *context) {
                     context);
 
         qvkcontext->signal_connection_backspace = g_signal_connect(
-                    qvkcontext->kb_proxy, "backspace",
-                    G_CALLBACK(_qvk_im_context_backspace_cb),
+                    qvkcontext->kb_proxy, "forward-key",
+                    G_CALLBACK(_qvk_im_context_forward_key_cb),
                     context);
     }
 
@@ -388,14 +391,21 @@ void _qvk_im_context_commit_string_cb(GObject *gobject,
     }
 }
 
-void _qvk_im_context_backspace_cb(GObject *gobject,
-                                  void *user_data)
+void _qvk_im_context_forward_key_cb(GObject *gobject,
+                                    gchar* key,
+                                    void *user_data)
 {
     QVK_DEBUG("callback backspace.");
 
     QVKIMContext *context = QVK_IM_CONTEXT(user_data);
 
-    GdkEventKey *event = _create_gdk_event(context->client_window, GDK_KEY_BackSpace, 0, GDK_KEY_PRESS);
+    guint keyval;
+    if (g_strcmp0(KeyReturn, key) == 0) {
+        keyval = GDK_KEY_Return;
+    } else if (g_strcmp0(KeyBackSpace, key) == 0) {
+        keyval = GDK_KEY_BackSpace;
+    }
+    GdkEventKey *event = _create_gdk_event(context->client_window, keyval, 0, GDK_KEY_PRESS);
     gdk_event_put((GdkEvent *)event);
     gdk_event_free((GdkEvent *)event);
 

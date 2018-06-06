@@ -5,6 +5,8 @@
 		<signal name="Commit">
 			<arg type="s" name="String" />
 		</signal>
-		<signal name="Backspace" />
+		<signal name="ForwardKey">
+			<arg type="s" name="Key" />
+		</signal>
 	</interface>
 </node>

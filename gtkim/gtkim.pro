@@ -25,6 +25,8 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs depr
 CONFIG += link_pkgconfig
 PKGCONFIG += gtk+-3.0
 
+include($$PWD/../interface/interface.pri)
+
 SOURCES += \
         im.c \
     imcontext.c \

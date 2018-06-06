@@ -10,6 +10,7 @@
 
 #include <qpa/qplatformintegration.h>
 
+#include "interface.h"
 
 Control::Control(QObject *parent)
     :QObject(parent),
@@ -70,9 +71,14 @@ bool Control::eventFilter(QObject *watched, QEvent *event)
         if (event->type() == QEvent::KeyRelease) {
             QKeyEvent *key = static_cast<QKeyEvent*>(event);
             if (!key->text().isEmpty()) {
-                emit Commit(key->text());
+                // special cases
+                if (key->text() == "\n") {
+                    emit ForwardKey(KeyReturn);
+                } else {
+                    emit Commit(key->text());
+                }
             } else if (key->key() == Qt::Key_Backspace) {
-                emit Backspace();
+                emit ForwardKey(KeyBackSpace);
             }
         }
     }

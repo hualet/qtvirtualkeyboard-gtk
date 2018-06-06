@@ -18,7 +18,7 @@ public:
 
 signals:
     void Commit(const QString &string);
-    void Backspace();
+    void ForwardKey(const QString &key);
 
 public slots:
     void ShowKeyboard();
