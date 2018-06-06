@@ -28,6 +28,14 @@ struct _QVKIMContext {
     GtkIMContext parent;
 
     GdkWindow *client_window;
+
+    // dbus stuff
+    GError *kb_error;
+    ComDeepinVirtualKeyboard *kb_proxy;
+    gulong signal_connection_commit;
+    gulong signal_connection_backspace;
+
+
 };
 
 struct _QVKIMContextClass {
@@ -88,10 +96,6 @@ static guint _signal_retrieve_surrounding_id = 0;
 static gboolean _use_sync_mode = 0;
 
 static GtkIMContext *_focus_im_context = NULL;
-
-// dbus stuff
-static ComDeepinVirtualKeyboard *kb_proxy = NULL;
-static GError *kb_error = NULL;
 
 void qvk_im_context_register_type(GTypeModule *type_module) {
     static const GTypeInfo qvk_im_context_info = {
@@ -183,25 +187,17 @@ static void qvk_im_context_class_fini(QVKIMContextClass *klass) {
 static void qvk_im_context_init(QVKIMContext *context) {
     QVK_DEBUG("qvk_im_context_init");
 
-    kb_proxy = com_deepin_virtual_keyboard_proxy_new_for_bus_sync(
+    context->kb_proxy = com_deepin_virtual_keyboard_proxy_new_for_bus_sync(
                 G_BUS_TYPE_SESSION,
                 G_DBUS_PROXY_FLAGS_NONE,
                 "com.deepin.VirtualKeyboard",
                 "/com/deepin/VirtualKeyboard",
-                NULL, &kb_error);
+                NULL, &context->kb_error);
 
-    if (kb_error != NULL) {
-        QVK_WARN("failed to create virtual keyboard proxy instance %s", kb_error->message);
-        kb_error = NULL;
+    if (context->kb_error != NULL) {
+        QVK_WARN("failed to create virtual keyboard proxy instance %s", context->kb_error->message);
+        context->kb_error = NULL;
     }
-
-    g_signal_connect(kb_proxy, "commit",
-                     G_CALLBACK(_qvk_im_context_commit_string_cb),
-                     context);
-
-    g_signal_connect(kb_proxy, "backspace",
-                     G_CALLBACK(_qvk_im_context_backspace_cb),
-                     context);
 
 #if GTK_CHECK_VERSION(3, 6, 0)
     g_signal_connect(context, "notify::input-hints",
@@ -219,7 +215,8 @@ static void qvk_im_context_finalize(GObject *obj) {
 
     qvk_im_context_set_client_window(GTK_IM_CONTEXT(context), NULL);
 
-    g_object_unref(kb_proxy);
+    if (context->kb_proxy)
+        g_object_unref(context->kb_proxy);
 
     G_OBJECT_CLASS(parent_class)->finalize(obj);
 }
@@ -257,13 +254,27 @@ static gboolean qvk_im_context_filter_keypress(GtkIMContext *context,
 ///
 static void qvk_im_context_focus_in(GtkIMContext *context) {
     QVK_DEBUG("qvk_im_context_focus_in");
+    QVKIMContext *qvkcontext = QVK_IM_CONTEXT(context);
 
-    com_deepin_virtual_keyboard_call_show_keyboard_sync(
-                kb_proxy,
-                NULL, &kb_error);
+    if (qvkcontext->kb_proxy) {
+        com_deepin_virtual_keyboard_call_show_keyboard_sync(
+                    qvkcontext->kb_proxy,
+                    NULL, &qvkcontext->kb_error);
 
-    if (kb_error) {
-        QVK_WARN("failed call to show keyboard: %s", kb_error->message);
+        if (qvkcontext->kb_error) {
+            QVK_WARN("failed call to show keyboard: %s", qvkcontext->kb_error->message);
+            qvkcontext->kb_error = NULL;
+        }
+
+        qvkcontext->signal_connection_commit =  g_signal_connect(
+                    qvkcontext->kb_proxy, "commit",
+                    G_CALLBACK(_qvk_im_context_commit_string_cb),
+                    context);
+
+        qvkcontext->signal_connection_backspace = g_signal_connect(
+                    qvkcontext->kb_proxy, "backspace",
+                    G_CALLBACK(_qvk_im_context_backspace_cb),
+                    context);
     }
 
     return;
@@ -271,13 +282,19 @@ static void qvk_im_context_focus_in(GtkIMContext *context) {
 
 static void qvk_im_context_focus_out(GtkIMContext *context) {
     QVK_DEBUG("qvk_im_context_focus_out");
+    QVKIMContext *qvkcontext = QVK_IM_CONTEXT(context);
 
-    com_deepin_virtual_keyboard_call_hide_keyboard_sync(
-                kb_proxy,
-                NULL, &kb_error);
+    if (qvkcontext->kb_proxy) {
+        g_signal_handler_disconnect(qvkcontext->kb_proxy, qvkcontext->signal_connection_commit);
+        g_signal_handler_disconnect(qvkcontext->kb_proxy, qvkcontext->signal_connection_backspace);
 
-    if (kb_error) {
-        QVK_WARN("failed call to hide keyboard: %s", kb_error->message);
+        com_deepin_virtual_keyboard_call_hide_keyboard_sync(
+                    qvkcontext->kb_proxy,
+                    NULL, &qvkcontext->kb_error);
+
+        if (qvkcontext->kb_error) {
+            QVK_WARN("failed call to hide keyboard: %s", qvkcontext->kb_error->message);
+        }
     }
 
     return;
