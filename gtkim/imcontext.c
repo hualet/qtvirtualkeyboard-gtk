@@ -239,8 +239,8 @@ static void set_ic_client_window(QVKIMContext *context,
 static void qvk_im_context_set_client_window(GtkIMContext *context,
                                              GdkWindow *client_window) {
     QVK_DEBUG("qvk_im_context_set_client_window");
-    QVKIMContext *fcitxcontext = QVK_IM_CONTEXT(context);
-    set_ic_client_window(fcitxcontext, client_window);
+    QVKIMContext *qvkcontext = QVK_IM_CONTEXT(context);
+    set_ic_client_window(qvkcontext, client_window);
 }
 
 ///
@@ -346,7 +346,7 @@ static void qvk_im_context_get_preedit_string(GtkIMContext *context,
                                               PangoAttrList **attrs,
                                               gint *cursor_pos) {
     QVK_DEBUG("qvk_im_context_get_preedit_string");
-    QVKIMContext *fcitxcontext = QVK_IM_CONTEXT(context);
+    QVKIMContext *qvkcontext = QVK_IM_CONTEXT(context);
 
     if (str) {
         // TODO
