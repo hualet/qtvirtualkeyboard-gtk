@@ -6,7 +6,7 @@
 
 QT       += core gui widgets dbus gui-private
 
-TARGET = qtvirtual-keyboard-helper
+TARGET = qtvirtualkeyboard-gtk-helper
 TEMPLATE = app
 
 # The following define makes your compiler emit warnings if you use
