@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Qt Virtual Keyboard Helper
+Exec=/usr/lib/qtvirtualkeyboard-gtk-helper
+OnlyShowIn=Deepin
+StartupNotify=false
+Terminal=false
+Type=Application

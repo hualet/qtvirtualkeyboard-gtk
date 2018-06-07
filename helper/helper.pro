@@ -38,3 +38,7 @@ isEmpty(PREFIX) {
 
 target.path = $$PREFIX/lib/
 INSTALLS += target
+
+desktop.files += qtvirtualkeyboard-gtk-helper.desktop
+desktop.path = /etc/xdg/autostart/
+INSTALLS += desktop
