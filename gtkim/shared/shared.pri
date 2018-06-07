@@ -1,13 +1,16 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2018-04-28T16:42:06
+# Project created by QtCreator 2018-06-05T11:18:52
 #
 #-------------------------------------------------
 
-QT       += core gui widgets dbus gui-private
+QT       -= core gui
 
-TARGET = qtvirtual-keyboard-helper
-TEMPLATE = app
+TARGET = qkv
+TEMPLATE = lib
+CONFIG += plugin
+
+DEFINES += GTKIM_LIBRARY
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which has been marked as deprecated (the exact warnings
@@ -20,21 +23,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
-include($$PWD/../interface/interface.pri)
+include($$PWD/../../interface/interface.pri)
 
 SOURCES += \
-        main.cpp \
-        control.cpp \
-    virtualkeyboard.cpp
+        $$PWD/im.c \
+    $$PWD/imcontext.c \
+    $$PWD/virtualkeyboard.c
 
 HEADERS += \
-        control.h \
-    virtualkeyboard.h
-
-
-isEmpty(PREFIX) {
-    PREFIX = /usr
-}
-
-target.path = $$PREFIX/lib/
-INSTALLS += target
+    $$PWD/imcontext.h \
+    $$PWD/virtualkeyboard.h
