@@ -10,6 +10,6 @@ Homepage: https://github.com/hualet/qtvirtualkeyboard-gtk
 
 Package: qtvirtualkeyboard-gtk
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, qtvirtualkeyboard-plugin
 Description: <insert up to 60 chars description>
  <insert long description, indented with spaces>
